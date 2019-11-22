@@ -1,0 +1,5 @@
+.idea/
+input/
+target/
+Makefile
+*.iml
