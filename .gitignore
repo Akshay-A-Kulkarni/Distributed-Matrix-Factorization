@@ -3,3 +3,4 @@ input/
 target/
 Makefile
 *.iml
+.DS_Store

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>cs6240</groupId>
-  <artifactId>spark-page-rank</artifactId>
-  <name>spark-page-rank</name>
+  <groupId>als</groupId>
+  <artifactId>spark-als</artifactId>
   <version>1.0</version>
+  <inceptionYear>2019</inceptionYear>
   <build>
     <sourceDirectory>src/main/scala</sourceDirectory>
     <plugins>
@@ -20,7 +20,7 @@
           </execution>
         </executions>
         <configuration>
-          <scalaVersion>${scala.version}</scalaVersion>
+          <scalaVersion>2.11.8</scalaVersion>
         </configuration>
       </plugin>
       <plugin>
@@ -50,9 +50,9 @@
     </plugins>
   </build>
   <properties>
-    <scala.version>2.11.12</scala.version>
+    <scala.version>2.11.8</scala.version>
     <encoding>UTF-8</encoding>
-    <spark.version>2.3.1</spark.version>
+    <spark.version>2.3.4</spark.version>
   </properties>
 </project>
 
