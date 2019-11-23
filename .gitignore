@@ -1,6 +1,8 @@
 .idea/
-input/
+input/*
 target/
 Makefile
 *.iml
 .DS_Store
+
+!input/small.txt
