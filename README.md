@@ -1,1 +1,1 @@
-# Matrix Factorization with Alternative Least Squares (ALS)
+# Matrix Factorization with Alternating Least Squares (ALS)
