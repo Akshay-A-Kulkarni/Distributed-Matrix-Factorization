@@ -1,17 +1,7 @@
 package matrix_factorization
 
-import org.apache.spark.{HashPartitioner, SparkConf, SparkContext}
 import org.apache.log4j.LogManager
-import org.apache.log4j.Logger
-import org.apache.log4j.Level
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.SQLContext
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.sources.Not
-
-import scala.collection.mutable
-import scala.util.Random
+import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 
 
@@ -23,11 +13,6 @@ object factorization {
   def main(args: Array[String]) {
 
     val logger: org.apache.log4j.Logger = LogManager.getRootLogger
-    val conf = new SparkConf().setAppName("Factorize Matrix").setMaster("local[*]")
-    val sc = new SparkContext(conf)
-    val spark = SparkSession.builder().config(conf).appName("Factorize Matrix").getOrCreate()
-    import spark.implicits._
-
     // Delete output directory, only to ease local development; will not work on AWS. ===========
     val hadoopConf = new org.apache.hadoop.conf.Configuration
     val hdfs = org.apache.hadoop.fs.FileSystem.get(hadoopConf)
@@ -38,9 +23,32 @@ object factorization {
     }
     // ================
 
-    // Define partitioner
-    val partitioner = new HashPartitioner(1)
+
+    val conf = new SparkConf()
+      .setAppName("MatrixFactorization")
+      .setMaster("local[*]")
+
+    val spark = SparkSession
+      .builder()
+      .config(conf)
+      .getOrCreate()
+
+    val mySpark = SparkSession
+      .builder()
+      .config(conf)
+      .getOrCreate()
 
 
-        }
+    // For implicit conversions like converting RDDs to DataFrames
+    import mySpark.implicits._
+
+    val sc = mySpark.sparkContext
+
+
+    var RDD_dataset = sc.textFile("input/small.txt")
+      .map(data => data.split(","))
+      .map(data => (data(0).toInt, data(1).toInt, data(2).toInt))
+
+    RDD_dataset.foreach(println)
+  }
 }
