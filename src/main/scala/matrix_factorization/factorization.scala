@@ -28,10 +28,10 @@ object factorization {
       .setAppName("MatrixFactorization")
       .setMaster("local[*]")
 
-    val spark = SparkSession
-      .builder()
-      .config(conf)
-      .getOrCreate()
+//     val spark = SparkSession
+//       .builder()
+//       .config(conf)
+//       .getOrCreate()
 
     val mySpark = SparkSession
       .builder()
