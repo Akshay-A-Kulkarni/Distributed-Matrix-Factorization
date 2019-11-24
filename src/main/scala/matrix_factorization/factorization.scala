@@ -10,6 +10,7 @@ object factorization {
 
   val n_factors = 10;
   val convergence_iterations = 10
+  val SeedVal = 123
 
   def main(args: Array[String]) {
 
@@ -45,26 +46,22 @@ object factorization {
                             }
                           }
 
+    val rand = scala.util.Random
+
     // Link information for users and items
     val user_blocks = getBlocks("user",inputRDD)
     val item_blocks = getBlocks("item",inputRDD)
 
-    // initialising Factor matrices
-    val P = user_blocks.mapValues{
-      val rand = scala.util.Random
-      var randList= Seq[Float]();
-      for ( i <- 0 to n_factors-1){
-        randList = randList :+ rand.nextFloat()
-      }
-      v => randList }
+    // initialising random Factor matrices
+    val P = user_blocks.mapPartitionsWithIndex { (idx, iter) =>
+      val rand = new scala.util.Random(idx+SeedVal)
+      iter.map(x => (x._1,Seq.fill(n_factors)(rand.nextInt(5))))
+    }
 
-    val Q = item_blocks.mapValues {
-      val rand = scala.util.Random
-      var randList= Seq[Float]();
-      for ( i <- 0 to n_factors-1) {
-        randList = randList :+ rand.nextFloat()
-      }
-      v => randList
+
+    val Q = item_blocks.mapPartitionsWithIndex { (idx, iter) =>
+      val rand = new scala.util.Random(idx+SeedVal)
+      iter.map(x => (x._1,Seq.fill(n_factors)(rand.nextInt(5))))
     }
 
     P.foreach(println)
