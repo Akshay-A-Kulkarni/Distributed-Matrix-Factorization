@@ -24,7 +24,6 @@ object factorization {
     }
     // ================
 
-
     val conf = new SparkConf()
       .setAppName("MatrixFactorization")
       .setMaster("local[*]")
@@ -34,41 +33,30 @@ object factorization {
       .config(conf)
       .getOrCreate()
 
-
     // For implicit conversions like converting RDDs to DataFrames
     import mySpark.implicits._
 
     val sc = mySpark.sparkContext
 
-
     val inputRDD = sc.textFile("input/small.txt")
-                          .map{
-                            line => {
-                              val list = line.split(",")
-                              (list(0).toInt, (list(1).toInt, list(2).toInt))
+                          .map{ line => {
+                            val list = line.split(",")
+                            (list(0).toInt, (list(1).toInt, list(2).toInt))
                             }
                           }
 
     // Link information for users and items
-
     val user_blocks = getBlocks("user",inputRDD)
     val item_blocks = getBlocks("item",inputRDD)
 
     // initialising Factor matrices
+    val P = user_blocks.mapValues{ val rand = scala.util.Random
+                                   v => rand.nextFloat() }
 
-    val P = user_blocks.mapValues{
-                         val rand = scala.util.Random
-                         v => rand.nextFloat()
-    }
-
-    val Q = item_blocks.mapValues{
-                          val rand = scala.util.Random
-                          v => rand.nextFloat()
-    }
-
+    val Q = item_blocks.mapValues{ val rand = scala.util.Random
+                                   v => rand.nextFloat() }
     P.foreach(println)
     Q.foreach(println)
-
   }
 
   def getBlocks(bType: String, R : RDD[(Int,(Int,Int))]): RDD[(Int,Iterable[Int])] = {
@@ -82,17 +70,13 @@ object factorization {
 
     (note : index functionality incomplete)
     */
-
     bType match {
                   case "user"  => {
                                     val userBlocks = R.map{ case (u,(i,v)) => (u,i) }.groupByKey()
-                                    return userBlocks
-                  }
+                                    return userBlocks }
                   case "item"  => {
                                     val itemBlocks= R.map{ case (u,(i,v)) => (u,i) }.map(x => x.swap).groupByKey()
-                                    return itemBlocks
-                  }
-
+                                    return itemBlocks }
     }
   }
 
