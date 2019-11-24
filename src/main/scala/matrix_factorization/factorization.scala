@@ -50,11 +50,23 @@ object factorization {
     val item_blocks = getBlocks("item",inputRDD)
 
     // initialising Factor matrices
-    val P = user_blocks.mapValues{ val rand = scala.util.Random
-                                   v => rand.nextFloat() }
+    val P = user_blocks.mapValues{
+      val rand = scala.util.Random
+      var randList= Seq[Float]();
+      for ( i <- 0 to n_factors-1){
+        randList = randList :+ rand.nextFloat()
+      }
+      v => randList }
 
-    val Q = item_blocks.mapValues{ val rand = scala.util.Random
-                                   v => rand.nextFloat() }
+    val Q = item_blocks.mapValues {
+      val rand = scala.util.Random
+      var randList= Seq[Float]();
+      for ( i <- 0 to n_factors-1) {
+        randList = randList :+ rand.nextFloat()
+      }
+      v => randList
+    }
+
     P.foreach(println)
     Q.foreach(println)
   }
