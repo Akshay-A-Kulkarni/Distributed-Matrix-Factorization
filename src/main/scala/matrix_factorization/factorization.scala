@@ -78,16 +78,16 @@ object factorization {
     R     : RDD -> initial ratings RDD
 
     The function takes in the input RDD to assign contiguous indices to users and items and computes the
-    user-item and item-user links.
+    user->item and item->user links.
 
-    (note : index functionality incomplete)
+    (note : indexing functionality incomplete)
     */
     bType match {
                   case "user"  => {
                                     val userBlocks = R.map{ case (u,(i,v)) => (u,i) }.groupByKey()
                                     return userBlocks }
                   case "item"  => {
-                                    val itemBlocks= R.map{ case (u,(i,v)) => (u,i) }.map(x => x.swap).groupByKey()
+                                    val itemBlocks= R.map{ case (u,(i,v)) => (i,u) }.groupByKey()
                                     return itemBlocks }
     }
   }
