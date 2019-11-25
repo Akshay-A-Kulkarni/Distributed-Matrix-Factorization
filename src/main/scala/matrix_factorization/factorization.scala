@@ -74,12 +74,21 @@ object factorization {
   }
 
   def sortByRelativeIndex(bType: String, input: RDD[(Int, (Int, Int))]): Array[(Int, Long)] = {
+    /*
+    @params
+    bType : Str -> block type  ("user"/"item")
+    R     : RDD -> initial ratings RDD
+
+    The function takes in the input RDD to assign each unique user/item ID to a relative index to a relative index
+    and sorts list in ascending order.
+
+    */
     bType match {
       case "user" => {
         return input
           .map(line => line._1)
           .distinct()
-          .sortBy(idx => idx, true, 1)
+          .sortBy(idx => idx, ascending = true, 1)
           .zipWithIndex()
           .collect()
       }
@@ -87,16 +96,26 @@ object factorization {
         return input
           .map(line => line._2._1)
           .distinct()
-          .sortBy(idx => idx, true, 1)
+          .sortBy(idx => idx, ascending = true, 1)
           .zipWithIndex()
           .collect()
       }
     }
   }
 
-  def getRelativeIndex(indexToFind: Int, relativeIndexList: Array[(Int, Long)]): Long = {
+  def getRelativeIndex(valueToFind: Int, relativeIndexList: Array[(Int, Long)]): Long = {
+    /*
+    @params
+    valueToFind       : Int -> user/item value to look up
+    relativeIndexList : Array -> (value, index) lookup array
+
+    This function takes input a value and a lookup table of (value, index) and returns the index for a given value).
+    Note: Each value is an unique identifier such that there will be no duplicates in lookup.
+    Each value->index relationship is 1-to-1
+
+    */
     return relativeIndexList
-      .filter(data => data._1 == indexToFind)
+      .filter(data => data._1 == valueToFind)
       .map(data => data._2)
       .head
   }
@@ -110,7 +129,6 @@ object factorization {
     The function takes in the input RDD to assign contiguous indices to users and items and computes the
     user->item and item->user links.
 
-    (note : indexing functionality incomplete)
     */
     bType match {
       case "user" => {
