@@ -69,8 +69,8 @@ object factorization {
     user_blocks.foreach(println)
     item_blocks.foreach(println)
 
-    //    P.foreach(println)
-    //    Q.foreach(println)
+        P.foreach(println)
+        Q.foreach(println)
   }
 
   def sortByRelativeIndex(bType: String, input: RDD[(Int, (Int, Int))]): Array[(Int, Long)] = {
