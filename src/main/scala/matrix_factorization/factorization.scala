@@ -46,8 +46,6 @@ object factorization {
                             }
                           }
 
-    val rand = scala.util.Random
-
     // Link information for users and items
     val user_blocks = getBlocks("user",inputRDD)
     val item_blocks = getBlocks("item",inputRDD)
@@ -57,7 +55,6 @@ object factorization {
       val rand = new scala.util.Random(idx+SeedVal)
       iter.map(x => (x._1,Seq.fill(n_factors)(rand.nextInt(5))))
     }
-
 
     val Q = item_blocks.mapPartitionsWithIndex { (idx, iter) =>
       val rand = new scala.util.Random(idx+SeedVal)
