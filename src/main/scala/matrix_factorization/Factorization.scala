@@ -11,7 +11,7 @@ object Factorization {
   val nFactors  : Int = 10
   val seedVal   : Int = 123
   val minRating : Int = 1
-  val maxRating : Int   = 5
+  val maxRating : Int = 5
   val convergenceIterations : Int = 10
 
   def main(args: Array[String]) {
@@ -40,7 +40,7 @@ object Factorization {
 
     val sc = spark.sparkContext
 
-    val partitioner = new HashPartitioner(1)
+    val partitioner = new HashPartitioner(5)
 
     val inputRDD = sc.textFile("input/small.txt")
       .map { line => {
@@ -49,6 +49,7 @@ object Factorization {
         }
       }.partitionBy(partitioner)
 
+//    (getRelativeIndex(u, sortedUsers), getRelativeIndex(i, sortedItems)
 
     val sortedUsers = sortByRelativeIndex("user", inputRDD)
     val sortedItems = sortByRelativeIndex("item", inputRDD)
@@ -58,8 +59,10 @@ object Factorization {
     val item_blocks = getBlocks("item", inputRDD, sortedUsers, sortedItems)
 
     // Creating two Ratings Matrices partitioned by user and item respectively
-    val R_u = inputRDD.cache()
-    val R_i = inputRDD.map(i => (i._2._1, (i._1,i._2._2))).partitionBy(partitioner).cache()
+    val R_u = inputRDD.map{case (u, (i, v)) => (getRelativeIndex(u, sortedUsers), (getRelativeIndex(i, sortedItems),v))}
+      .cache()
+
+    val R_i = R_u.map(i => (i._2._1, (i._1, i._2._2))).partitionBy(partitioner).cache()
 
     // initialising random Factor matrices
     val P = user_blocks.mapPartitionsWithIndex { (idx, row) =>
@@ -80,7 +83,9 @@ object Factorization {
 //    user_blocks.foreach(println)
 //    item_blocks.foreach(println)
 //
-//    R_i.foreach(println)
+    R_i.foreach(println)
+//    R_i.mapPartitionsWithIndex( (index: Int, it: Iterator[Long]) =>
+//      it.toList.map(x => if (index ==5) {println(x)}).iterator).collect
 //    Q.foreach(println)
   }
 
