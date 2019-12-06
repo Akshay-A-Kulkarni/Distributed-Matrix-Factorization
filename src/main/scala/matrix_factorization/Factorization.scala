@@ -15,6 +15,8 @@ object Factorization {
   val minRating : Int = 1
   val maxRating : Int = 5
   val convergenceIterations : Int = 10
+  val lambda : Double = 0.01
+
 
   def main(args: Array[String]) {
 
@@ -43,6 +45,13 @@ object Factorization {
     val sc = spark.sparkContext
 
     val partitioner = new HashPartitioner(5)
+
+    val residual = sc.doubleAccumulator
+    val pu_norm = sc.doubleAccumulator
+    val qi_norm = sc.doubleAccumulator
+
+    // the objective function to be minimized, with L2 normalization
+    val cost = residual.sum + (lambda * (pu_norm.sum + qi_norm.sum))
 
     val inputRDD = sc.textFile("input/small.txt")
       .map { line => {
