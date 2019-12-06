@@ -1,6 +1,8 @@
 package matrix_factorization
 
+import breeze.linalg.DenseMatrix
 import org.apache.log4j.LogManager
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.{HashPartitioner, SparkConf}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
@@ -64,6 +66,11 @@ object Factorization {
 
     val R_i = R_u.map(i => (i._2._1, (i._1, i._2._2))).partitionBy(partitioner).cache()
 
+
+//    val R_u = inputRDD.cache()
+//    val R_i = R_u.partitionBy(partitioner).cache()
+
+
     // initialising random Factor matrices
     val P = user_blocks.mapPartitionsWithIndex { (idx, row) =>
       val rand = new scala.util.Random(idx + seedVal)
@@ -76,17 +83,48 @@ object Factorization {
     }.collect()
 
 
-//    val U = sc.broadcast(P)
-//    val M = sc.broadcast(Q)
+    val U = sc.broadcast(P)
+    val M = sc.broadcast(Q)
 
-    //    sortedUsers.foreach(println)
-//    user_blocks.foreach(println)
-//    item_blocks.foreach(println)
-//
-    R_i.foreach(println)
+    // loop:
+
+    var p_us = R_u
+        .groupByKey()
+      .foreach( row => getNewLatentColumn(row, U, M))
+
+    // converts p_us to a matrix and rebroadcasts P
+
+    var q_is = R_i
+      .groupByKey()
+      .foreach( column => getNewLatentColumn(column, U, M))
+
+    // converts Q_Is to a matrix and rebroadcasts Q
+
+    // compute cost
+
+    // check for minimziation of cost
+
+
+
+
+
 //    R_i.mapPartitionsWithIndex( (index: Int, it: Iterator[Long]) =>
 //      it.toList.map(x => if (index ==5) {println(x)}).iterator).collect
 //    Q.foreach(println)
+  }
+
+
+  def getNewLatentColumn(input: (Long, Iterable[(Long, Int)]), P: Broadcast[Array[(Long, Seq[Int])]], Q: Broadcast[Array[(Long, Seq[Int])]]): DenseMatrix[Double] = {
+
+    var key = input._1
+
+    var data = input._2
+    var nonEmptyColumnIndicies = data.map( d => d._1)
+
+    println(key, nonEmptyColumnIndicies)
+
+    var new_latent_column_for_key = DenseMatrix.rand[Double](nFactors, 1)
+    return new_latent_column_for_key
   }
 
   def sortByRelativeIndex(bType: String, input: RDD[(Int, (Int, Int))]): Array[(Int, Long)] = {
