@@ -90,15 +90,19 @@ object Factorization {
 
     var p_us = R_u
         .groupByKey()
-      .foreach( row => getNewLatentColumn(row, U, M))
+        .map( row => getNewLatentColumn(row, U, M))
+
+    p_us.zipWithIndex().foreach(println)
 
     // converts p_us to a matrix and rebroadcasts P
 
     var q_is = R_i
       .groupByKey()
-      .foreach( column => getNewLatentColumn(column, U, M))
+      .map( column => getNewLatentColumn(column, U, M))
 
-    // converts Q_Is to a matrix and rebroadcasts Q
+    // converts q_is to a matrix and rebroadcasts Q
+
+    q_is.zipWithIndex().foreach(println)
 
     // compute cost
 
