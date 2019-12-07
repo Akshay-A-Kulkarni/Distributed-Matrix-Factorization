@@ -74,17 +74,18 @@ object Factorization {
     // initialising random Factor matrices
     val P = user_blocks.mapPartitionsWithIndex { (idx, row) =>
       val rand = new scala.util.Random(idx + seedVal)
-      row.map(x => (x._1, Seq.fill(nFactors)(minRating + rand.nextInt((maxRating - minRating) + 1 ))))
+      row.map(x => (x._1, Seq.fill(nFactors)(minRating + rand.nextDouble() * (maxRating - minRating) + 1 )))
     }.collect()
 
     val Q = item_blocks.mapPartitionsWithIndex { (idx, row) =>
       val rand = new scala.util.Random(idx + seedVal)
-      row.map(x => (x._1, Seq.fill(nFactors)(minRating + rand.nextInt((maxRating - minRating) + 1 ))))
+      row.map(x => (x._1, Seq.fill(nFactors)(minRating + rand.nextDouble() * (maxRating - minRating) + 1 )))
     }.collect()
 
 
     val U = sc.broadcast(P)
     val M = sc.broadcast(Q)
+
 
     // loop:
 
@@ -92,9 +93,9 @@ object Factorization {
         .groupByKey()
         .map( row => getNewLatentColumn(row, U, M))
 
-    p_us.zipWithIndex().foreach(println)
-
     // converts p_us to a matrix and rebroadcasts P
+    var newP = p_us.zipWithIndex().map( pair => (pair._2, pair._1)).collect()
+
 
     var q_is = R_i
       .groupByKey()
@@ -102,7 +103,7 @@ object Factorization {
 
     // converts q_is to a matrix and rebroadcasts Q
 
-    q_is.zipWithIndex().foreach(println)
+    var newQ = q_is.zipWithIndex().map( pair => (pair._2, pair._1)).foreach(println)
 
     // compute cost
 
@@ -118,14 +119,14 @@ object Factorization {
   }
 
 
-  def getNewLatentColumn(input: (Long, Iterable[(Long, Int)]), P: Broadcast[Array[(Long, Seq[Int])]], Q: Broadcast[Array[(Long, Seq[Int])]]): DenseMatrix[Double] = {
+  def getNewLatentColumn(input: (Long, Iterable[(Long, Int)]), P: Broadcast[Array[(Long, Seq[Double])]], Q: Broadcast[Array[(Long, Seq[Double])]]): DenseMatrix[Double] = {
 
     var key = input._1
 
     var data = input._2
     var nonEmptyColumnIndicies = data.map( d => d._1)
 
-    println(key, nonEmptyColumnIndicies)
+    //println(key, nonEmptyColumnIndicies)
 
     var new_latent_column_for_key = DenseMatrix.rand[Double](nFactors, 1)
     return new_latent_column_for_key
