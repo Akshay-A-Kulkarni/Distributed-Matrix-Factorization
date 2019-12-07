@@ -1,6 +1,6 @@
 package matrix_factorization
 
-import breeze.linalg.DenseMatrix
+import breeze.linalg.{DenseMatrix, DenseVector, pinv}
 import org.apache.log4j.LogManager
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.{HashPartitioner, SparkConf}
@@ -210,5 +210,58 @@ object Factorization {
         return itemBlocks
       }
     }
+  }
+
+  def computeGradient(P: DenseMatrix[Double],Q: DenseMatrix[Double],R: RDD[(Long,(Long,Int))]): Unit = {
+    /*
+    @params
+    P : DenseMatrix[Double]   : Broadcasted dense latent factor matrix
+    Q: DenseMatrix[Double]    : Broadcasted dense latent factor matrix
+    R: RDD[(Long,(Long,Int))] : Input RDD of the dense representation of the rating matrix
+
+    Note : Possible addition of a Lambda param.
+
+    Computes the gradient step and updates for each latent factor matrix.
+    */
+
+    val lambda = 1.0
+    var temp = R.groupByKey()
+    val P_u = temp.mapValues(values => values.unzip)
+    P_u.mapValues{ case (colList, rateList) =>
+      pinv(computeTransposeProductSum(colList,Q) + lambda *:* DenseMatrix.eye[Double](Q.rows))* computeRatingProduct(colList, rateList ,Q) }
+  }
+
+  def computeTransposeProductSum(columns: Iterable[Long], M : DenseMatrix[Double]): DenseMatrix[Double]= {
+    /*
+    @params
+    columns: Iterable[Long] : list of indices associated with given user/item.
+    M: DenseMatrix[Double]    : Broadcasted dense latent factor matrix
+
+    */
+    var LatentFactorSum = DenseMatrix.zeros[Double](M.rows,M.rows)
+    for (i <- columns.toList){
+      val C = M(::, i.toInt)
+      val ColProd = C * C.t
+      LatentFactorSum :+=  ColProd }
+    return LatentFactorSum
+  }
+
+  def computeRatingProduct(columns: Iterable[Long], ratings: Iterable[Int], M : DenseMatrix[Double]): DenseMatrix[Double]= {
+    /*
+    @params
+    columns: Iterable[Long] : list of indices associated with given user/item.
+    ratings: Iterable[Int]
+    M: DenseMatrix[Double]    : Broadcasted dense latent factor matrix
+
+*/
+    var RatingProdFactorSum = DenseVector.zeros[Double](M.rows)
+    val TList = ratings.toList.zip(columns.toList)
+    for (i <- TList) {
+      val r_ui = i._1.toDouble
+      val C = M(::, i._2.toInt)
+      val result = r_ui *:* C
+      RatingProdFactorSum :+= result
+    }
+    return RatingProdFactorSum.toDenseMatrix.t
   }
 }
