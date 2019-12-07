@@ -1,6 +1,5 @@
 package matrix_factorization
 
-import breeze.linalg.{DenseMatrix, DenseVector, pinv}
 import org.apache.log4j.LogManager
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.{HashPartitioner, SparkConf}
@@ -8,15 +7,13 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 
 
-object Factorization {
+object alscopy {
 
   val nFactors  : Int = 10
   val seedVal   : Int = 123
   val minRating : Int = 1
   val maxRating : Int = 5
   val convergenceIterations : Int = 10
-  val lambda : Double = 0.01
-
 
   def main(args: Array[String]) {
 
@@ -46,13 +43,6 @@ object Factorization {
 
     val partitioner = new HashPartitioner(5)
 
-    val residual = sc.doubleAccumulator
-    val pu_norm = sc.doubleAccumulator
-    val qi_norm = sc.doubleAccumulator
-
-    // the objective function to be minimized, with L2 normalization
-    val cost = residual.sum + (lambda * (pu_norm.sum + qi_norm.sum))
-
     val inputRDD = sc.textFile("input/small.txt")
       .map { line => {
         val list = line.split(",")
@@ -70,49 +60,47 @@ object Factorization {
     val item_blocks = getBlocks("item", inputRDD, sortedUsers, sortedItems)
 
     // Creating two Ratings Matrices partitioned by user and item respectively
-    val R_u = inputRDD.map{case (u, (i, v)) => (getRelativeIndex(u, sortedUsers), (getRelativeIndex(i, sortedItems),v))}
-      .cache()
+    //    val R_u = inputRDD.map{case (u, (i, v)) => (getRelativeIndex(u, sortedUsers), (getRelativeIndex(i, sortedItems),v))}
+    //      .cache()
+    //
+    //    val R_i = R_u.map(i => (i._2._1, (i._1, i._2._2))).partitionBy(partitioner).cache()
 
-    val R_i = R_u.map(i => (i._2._1, (i._1, i._2._2))).partitionBy(partitioner).cache()
 
-
-    //    val R_u = inputRDD.cache()
-    //    val R_i = R_u.partitionBy(partitioner).cache()
+    val R_u = inputRDD.cache()
+    val R_i = R_u.partitionBy(partitioner).cache()
 
 
     // initialising random Factor matrices
     val P = user_blocks.mapPartitionsWithIndex { (idx, row) =>
       val rand = new scala.util.Random(idx + seedVal)
-      row.map(x => (x._1, Seq.fill(nFactors)(minRating + rand.nextDouble() * (maxRating - minRating) + 1 )))
+      row.map(x => (x._1, Seq.fill(nFactors)(minRating + rand.nextInt((maxRating - minRating) + 1 ))))
     }.collect()
 
     val Q = item_blocks.mapPartitionsWithIndex { (idx, row) =>
       val rand = new scala.util.Random(idx + seedVal)
-      row.map(x => (x._1, Seq.fill(nFactors)(minRating + rand.nextDouble() * (maxRating - minRating) + 1 )))
+      row.map(x => (x._1, Seq.fill(nFactors)(minRating + rand.nextInt((maxRating - minRating) + 1 ))))
     }.collect()
 
 
     val U = sc.broadcast(P)
     val M = sc.broadcast(Q)
 
+    //    sortedUsers.foreach(println)
+    //    user_blocks.foreach(println)
+    //    item_blocks.foreach(println)
+    //
+
 
     // loop:
 
-    var p_us = R_u
-      .groupByKey()
-      .map( row => getNewLatentColumn(row, U, M))
+    var p_us = R_u.foreach( row => updateUser(row, U, M))
 
+    user_blocks.foreach(println)
     // converts p_us to a matrix and rebroadcasts P
-    var newP = p_us.zipWithIndex().map( pair => (pair._2, pair._1)).collect()
 
+    // var q_is =  R_i.foreach( row => updateItem(row, U, M))
 
-    var q_is = R_i
-      .groupByKey()
-      .map( column => getNewLatentColumn(column, U, M))
-
-    // converts q_is to a matrix and rebroadcasts Q
-
-    var newQ = q_is.zipWithIndex().map( pair => (pair._2, pair._1)).foreach(println)
+    // converts Q_Is to a matrix and rebroadcasts Q
 
     // compute cost
 
@@ -128,17 +116,33 @@ object Factorization {
   }
 
 
-  def getNewLatentColumn(input: (Long, Iterable[(Long, Int)]), P: Broadcast[Array[(Long, Seq[Double])]], Q: Broadcast[Array[(Long, Seq[Double])]]): DenseMatrix[Double] = {
+  def updateUser(row: (Int, (Int, Int)), P: Broadcast[Array[(Long, Seq[Int])]], Q: Broadcast[Array[(Long, Seq[Int])]]): Unit = {
 
-    var key = input._1
+    // What we need:
+    // row from R_u
+    // From Q, all non-empty columns from R_u
 
-    var data = input._2
-    var nonEmptyColumnIndicies = data.map( d => d._1)
+    var userId = row._1
+    var movieId = row._2._1
 
-    //println(key, nonEmptyColumnIndicies)
 
-    var new_latent_column_for_key = DenseMatrix.rand[Double](nFactors, 1)
-    return new_latent_column_for_key
+    // loop through all nonempty columnsin row
+
+    var q_i = getLatentColumn(Q, movieId)
+
+
+    // compute p_u
+
+    var p_u = 0 // TBD
+
+
+    return p_u
+  }
+
+
+
+  def getLatentColumn(L: Broadcast[Array[(Long, Seq[Int])]], i: Long): Unit = {
+    return L.value.zipWithIndex.filter( index => index._1 == i)
   }
 
   def sortByRelativeIndex(bType: String, input: RDD[(Int, (Int, Int))]): Array[(Int, Long)] = {
@@ -211,58 +215,5 @@ object Factorization {
         return itemBlocks
       }
     }
-  }
-
-  def computeGradient(P: DenseMatrix[Double],Q: DenseMatrix[Double],R: RDD[(Long,(Long,Int))]): Unit = {
-    /*
-    @params
-    P : DenseMatrix[Double]   : Broadcasted dense latent factor matrix
-    Q: DenseMatrix[Double]    : Broadcasted dense latent factor matrix
-    R: RDD[(Long,(Long,Int))] : Input RDD of the dense representation of the rating matrix
-
-    Note : Possible addition of a Lambda param.
-
-    Computes the gradient step and updates for each latent factor matrix.
-    */
-
-    val lambda = 1.0
-    var temp = R.groupByKey()
-    val P_u = temp.mapValues(values => values.unzip)
-    P_u.mapValues{ case (colList, rateList) =>
-      pinv(computeTransposeProductSum(colList,Q) + lambda *:* DenseMatrix.eye[Double](Q.rows))* computeRatingProduct(colList, rateList ,Q) }
-  }
-
-  def computeTransposeProductSum(columns: Iterable[Long], M : DenseMatrix[Double]): DenseMatrix[Double]= {
-    /*
-    @params
-    columns: Iterable[Long] : list of indices associated with given user/item.
-    M: DenseMatrix[Double]    : Broadcasted dense latent factor matrix
-
-    */
-    var LatentFactorSum = DenseMatrix.zeros[Double](M.rows,M.rows)
-    for (i <- columns.toList){
-      val C = M(::, i.toInt)
-      val ColProd = C * C.t
-      LatentFactorSum :+=  ColProd }
-    return LatentFactorSum
-  }
-
-  def computeRatingProduct(columns: Iterable[Long], ratings: Iterable[Int], M : DenseMatrix[Double]): DenseMatrix[Double]= {
-    /*
-    @params
-    columns: Iterable[Long] : list of indices associated with given user/item.
-    ratings: Iterable[Int]
-    M: DenseMatrix[Double]    : Broadcasted dense latent factor matrix
-
-*/
-    var RatingProdFactorSum = DenseVector.zeros[Double](M.rows)
-    val TList = ratings.toList.zip(columns.toList)
-    for (i <- TList) {
-      val r_ui = i._1.toDouble
-      val C = M(::, i._2.toInt)
-      val result = r_ui *:* C
-      RatingProdFactorSum :+= result
-    }
-    return RatingProdFactorSum.toDenseMatrix.t
   }
 }
