@@ -1,6 +1,8 @@
 package matrix_factorization
 
+import breeze.linalg.DenseMatrix
 import org.apache.log4j.LogManager
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.{HashPartitioner, SparkConf}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
@@ -13,6 +15,8 @@ object Factorization {
   val minRating : Int = 1
   val maxRating : Int = 5
   val convergenceIterations : Int = 10
+  val lambda : Double = 0.01
+
 
   def main(args: Array[String]) {
 
@@ -28,12 +32,12 @@ object Factorization {
     // ================
 
     val conf = new SparkConf()
-                              .setAppName("MatrixFactorization")
-                              .setMaster("local[*]")
+      .setAppName("MatrixFactorization")
+      .setMaster("local[*]")
 
     val spark = SparkSession.builder()
-                            .config(conf)
-                            .getOrCreate()
+      .config(conf)
+      .getOrCreate()
 
     // For implicit conversions like converting RDDs to DataFrames
     import spark.implicits._
@@ -42,14 +46,21 @@ object Factorization {
 
     val partitioner = new HashPartitioner(5)
 
+    val residual = sc.doubleAccumulator
+    val pu_norm = sc.doubleAccumulator
+    val qi_norm = sc.doubleAccumulator
+
+    // the objective function to be minimized, with L2 normalization
+    val cost = residual.sum + (lambda * (pu_norm.sum + qi_norm.sum))
+
     val inputRDD = sc.textFile("input/small.txt")
       .map { line => {
         val list = line.split(",")
         (list(0).toInt, (list(1).toInt, list(2).toInt))
-        }
+      }
       }.partitionBy(partitioner)
 
-//    (getRelativeIndex(u, sortedUsers), getRelativeIndex(i, sortedItems)
+    //    (getRelativeIndex(u, sortedUsers), getRelativeIndex(i, sortedItems)
 
     val sortedUsers = sortByRelativeIndex("user", inputRDD)
     val sortedItems = sortByRelativeIndex("item", inputRDD)
@@ -63,6 +74,11 @@ object Factorization {
       .cache()
 
     val R_i = R_u.map(i => (i._2._1, (i._1, i._2._2))).partitionBy(partitioner).cache()
+
+
+    //    val R_u = inputRDD.cache()
+    //    val R_i = R_u.partitionBy(partitioner).cache()
+
 
     // initialising random Factor matrices
     val P = user_blocks.mapPartitionsWithIndex { (idx, row) =>
@@ -79,14 +95,49 @@ object Factorization {
     val U = sc.broadcast(P)
     val M = sc.broadcast(Q)
 
-    //    sortedUsers.foreach(println)
-//    user_blocks.foreach(println)
-//    item_blocks.foreach(println)
-//
-    R_i.foreach(println)
-//    R_i.mapPartitionsWithIndex( (index: Int, it: Iterator[Long]) =>
-//      it.toList.map(x => if (index ==5) {println(x)}).iterator).collect
-//    Q.foreach(println)
+    // loop:
+
+    var p_us = R_u
+      .groupByKey()
+      .map( row => getNewLatentColumn(row, U, M))
+
+    p_us.zipWithIndex().foreach(println)
+
+    // converts p_us to a matrix and rebroadcasts P
+
+    var q_is = R_i
+      .groupByKey()
+      .map( column => getNewLatentColumn(column, U, M))
+
+    // converts q_is to a matrix and rebroadcasts Q
+
+    q_is.zipWithIndex().foreach(println)
+
+    // compute cost
+
+    // check for minimziation of cost
+
+
+
+
+
+    //    R_i.mapPartitionsWithIndex( (index: Int, it: Iterator[Long]) =>
+    //      it.toList.map(x => if (index ==5) {println(x)}).iterator).collect
+    //    Q.foreach(println)
+  }
+
+
+  def getNewLatentColumn(input: (Long, Iterable[(Long, Int)]), P: Broadcast[Array[(Long, Seq[Int])]], Q: Broadcast[Array[(Long, Seq[Int])]]): DenseMatrix[Double] = {
+
+    var key = input._1
+
+    var data = input._2
+    var nonEmptyColumnIndicies = data.map( d => d._1)
+
+    println(key, nonEmptyColumnIndicies)
+
+    var new_latent_column_for_key = DenseMatrix.rand[Double](nFactors, 1)
+    return new_latent_column_for_key
   }
 
   def sortByRelativeIndex(bType: String, input: RDD[(Int, (Int, Int))]): Array[(Int, Long)] = {
@@ -150,12 +201,12 @@ object Factorization {
     bType match {
       case "user" => {
         val userBlocks = R.map {case (u, (i, v)) => (getRelativeIndex(u, sortedUsers), getRelativeIndex(i, sortedItems))
-                                  }.groupByKey()
+        }.groupByKey()
         return userBlocks
       }
       case "item" => {
         val itemBlocks = R.map {case (u, (i, v)) => (getRelativeIndex(i, sortedItems), getRelativeIndex(u, sortedUsers))
-                                  }.groupByKey()
+        }.groupByKey()
         return itemBlocks
       }
     }
