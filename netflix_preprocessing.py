@@ -26,7 +26,7 @@ for file_name in files:
             assert movie >= 0
             splitted = line.split(',')
             user = int(splitted[0])
-            rating = float(splitted[1])
+            rating = int(splitted[1])
             user_row.append(user)
             movie_col.append(movie)
             rat_val.append(rating)
@@ -37,4 +37,4 @@ netflix_df = pd.DataFrame(list(zip(user_row, movie_col, rat_val)),
               columns=['user','movie', 'rating'])
 
 # Output pre-processed data to csv/text file
-netflix_df.to_csv(r'netflix_data\input_data.csv')
+netflix_df.to_csv(r'input\preprocessed_data.csv', header=False, index=False)
