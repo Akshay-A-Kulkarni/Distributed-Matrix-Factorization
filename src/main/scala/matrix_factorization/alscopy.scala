@@ -1,12 +1,13 @@
 package matrix_factorization
 
 import org.apache.log4j.LogManager
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.{HashPartitioner, SparkConf}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 
 
-object Factorization {
+object alscopy {
 
   val nFactors  : Int = 10
   val seedVal   : Int = 123
@@ -28,12 +29,12 @@ object Factorization {
     // ================
 
     val conf = new SparkConf()
-                              .setAppName("MatrixFactorization")
-                              .setMaster("local[*]")
+      .setAppName("MatrixFactorization")
+      .setMaster("local[*]")
 
     val spark = SparkSession.builder()
-                            .config(conf)
-                            .getOrCreate()
+      .config(conf)
+      .getOrCreate()
 
     // For implicit conversions like converting RDDs to DataFrames
     import spark.implicits._
@@ -46,10 +47,10 @@ object Factorization {
       .map { line => {
         val list = line.split(",")
         (list(0).toInt, (list(1).toInt, list(2).toInt))
-        }
+      }
       }.partitionBy(partitioner)
 
-//    (getRelativeIndex(u, sortedUsers), getRelativeIndex(i, sortedItems)
+    //    (getRelativeIndex(u, sortedUsers), getRelativeIndex(i, sortedItems)
 
     val sortedUsers = sortByRelativeIndex("user", inputRDD)
     val sortedItems = sortByRelativeIndex("item", inputRDD)
@@ -59,10 +60,15 @@ object Factorization {
     val item_blocks = getBlocks("item", inputRDD, sortedUsers, sortedItems)
 
     // Creating two Ratings Matrices partitioned by user and item respectively
-    val R_u = inputRDD.map{case (u, (i, v)) => (getRelativeIndex(u, sortedUsers), (getRelativeIndex(i, sortedItems),v))}
-      .cache()
+    //    val R_u = inputRDD.map{case (u, (i, v)) => (getRelativeIndex(u, sortedUsers), (getRelativeIndex(i, sortedItems),v))}
+    //      .cache()
+    //
+    //    val R_i = R_u.map(i => (i._2._1, (i._1, i._2._2))).partitionBy(partitioner).cache()
 
-    val R_i = R_u.map(i => (i._2._1, (i._1, i._2._2))).partitionBy(partitioner).cache()
+
+    val R_u = inputRDD.cache()
+    val R_i = R_u.partitionBy(partitioner).cache()
+
 
     // initialising random Factor matrices
     val P = user_blocks.mapPartitionsWithIndex { (idx, row) =>
@@ -80,13 +86,63 @@ object Factorization {
     val M = sc.broadcast(Q)
 
     //    sortedUsers.foreach(println)
-//    user_blocks.foreach(println)
-//    item_blocks.foreach(println)
-//
-    R_i.foreach(println)
-//    R_i.mapPartitionsWithIndex( (index: Int, it: Iterator[Long]) =>
-//      it.toList.map(x => if (index ==5) {println(x)}).iterator).collect
-//    Q.foreach(println)
+    //    user_blocks.foreach(println)
+    //    item_blocks.foreach(println)
+    //
+
+
+    // loop:
+
+    var p_us = R_u.foreach( row => updateUser(row, U, M))
+
+    user_blocks.foreach(println)
+    // converts p_us to a matrix and rebroadcasts P
+
+    // var q_is =  R_i.foreach( row => updateItem(row, U, M))
+
+    // converts Q_Is to a matrix and rebroadcasts Q
+
+    // compute cost
+
+    // check for minimziation of cost
+
+
+
+
+
+    //    R_i.mapPartitionsWithIndex( (index: Int, it: Iterator[Long]) =>
+    //      it.toList.map(x => if (index ==5) {println(x)}).iterator).collect
+    //    Q.foreach(println)
+  }
+
+
+  def updateUser(row: (Int, (Int, Int)), P: Broadcast[Array[(Long, Seq[Int])]], Q: Broadcast[Array[(Long, Seq[Int])]]): Unit = {
+
+    // What we need:
+    // row from R_u
+    // From Q, all non-empty columns from R_u
+
+    var userId = row._1
+    var movieId = row._2._1
+
+
+    // loop through all nonempty columnsin row
+
+    var q_i = getLatentColumn(Q, movieId)
+
+
+    // compute p_u
+
+    var p_u = 0 // TBD
+
+
+    return p_u
+  }
+
+
+
+  def getLatentColumn(L: Broadcast[Array[(Long, Seq[Int])]], i: Long): Unit = {
+    return L.value.zipWithIndex.filter( index => index._1 == i)
   }
 
   def sortByRelativeIndex(bType: String, input: RDD[(Int, (Int, Int))]): Array[(Int, Long)] = {
@@ -150,12 +206,12 @@ object Factorization {
     bType match {
       case "user" => {
         val userBlocks = R.map {case (u, (i, v)) => (getRelativeIndex(u, sortedUsers), getRelativeIndex(i, sortedItems))
-                                  }.groupByKey()
+        }.groupByKey()
         return userBlocks
       }
       case "item" => {
         val itemBlocks = R.map {case (u, (i, v)) => (getRelativeIndex(i, sortedItems), getRelativeIndex(u, sortedUsers))
-                                  }.groupByKey()
+        }.groupByKey()
         return itemBlocks
       }
     }
