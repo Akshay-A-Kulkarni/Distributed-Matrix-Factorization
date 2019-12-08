@@ -91,30 +91,32 @@ object Factorization {
 //    }.collect()
 
     val rand = new scala.util.Random(seedVal)
+    val rand1 = new scala.util.Random(seedVal+1)
     var P = DenseMatrix.fill(nFactors, sortedUsers.length)(minRating + rand.nextDouble() * (maxRating - minRating) + 1)
-    var Q = DenseMatrix.fill(nFactors, sortedItems.length)(minRating + rand.nextDouble() * (maxRating - minRating) + 1)
+    var Q = DenseMatrix.fill(nFactors, sortedItems.length)(minRating + rand1.nextDouble() * (maxRating - minRating) + 1)
 
-    var q_bcast = sc.broadcast(Q)
-    var p_bcast = sc.broadcast(P)
+    var q_bdcast = sc.broadcast(Q)
+    var p_bdcast = sc.broadcast(P)
 
     val iterations  = sc.longAccumulator
-    var totalCost = Double.MaxValue
+    var totalCost : Double = 0.0
     val tolerance = 0.005
-    var prevCost = sc.broadcast(0.0)
-
+    var prevCost = sc.doubleAccumulator
+    val costDiff = sc.doubleAccumulator
+    costDiff.add(Double.MaxValue)
     val residual = sc.doubleAccumulator
 
-    while(totalCost >= tolerance && iterations.value < convergenceIterations ) {
+    while(costDiff.value >= tolerance && iterations.value < convergenceIterations ) {
       // Step to calculate New P
       // Calculates gradient for new P in RDD form
-      val newP = computeGradient(R_u, q_bcast, lambda)
+      val newP = computeGradient(R_u, q_bdcast, lambda)
         .sortByKey()
         .map(data => data._2)
         .collect()
 
       // #### Step to calculate New Q ####
       // calculates gradient for new Q in RDD form
-      val newQ = computeGradient(R_i, p_bcast, lambda)
+      val newQ = computeGradient(R_i, p_bdcast, lambda)
         .sortByKey()
         .map(data => data._2)
         .collect()
@@ -125,18 +127,18 @@ object Factorization {
       Q = DenseMatrix(newQ.map(_.toArray):_*).t
 
       // Rebroadcast P
-      p_bcast.destroy()
-      p_bcast = sc.broadcast(P)
+      p_bdcast.destroy()
+      p_bdcast = sc.broadcast(P)
 
       // Rebroadcast Q
-      q_bcast.destroy()
-      q_bcast = sc.broadcast(Q)
+      q_bdcast.destroy()
+      q_bdcast = sc.broadcast(Q)
 
       // #### Step to compute cost ####
       R_u.foreach{ case (userId, (movieId, r_ij)) =>
           val q_i = Q(::, movieId.toInt)
           val p_u = P(::, userId.toInt)
-          residual.add( math.pow(r_ij - (p_u.t * q_i), 2))
+          residual.add(math.pow(r_ij - (p_u.t * q_i), 2))
       }
 
       val pu_norm = sum(sum(P *:* P, Axis._0))
@@ -144,13 +146,14 @@ object Factorization {
 
       totalCost = residual.sum + lambda * (pu_norm + qi_norm)
 
-      val costDiff = math.abs(totalCost - prevCost.value)
+      costDiff.reset()
+      costDiff.add(math.abs(totalCost - prevCost.value))
 
-      println("Iteration(" + iterations.value + ") Cost: " + totalCost + " Delta: " + costDiff)
+      println("Iteration(" + iterations.value + ") Cost: " + totalCost + " Delta: " + costDiff.value)
       residual.reset()
 
-      prevCost.unpersist()
-      prevCost = sc.broadcast(totalCost)
+      prevCost.reset()
+      prevCost.add(totalCost)
 
       iterations.add(1)
     }
