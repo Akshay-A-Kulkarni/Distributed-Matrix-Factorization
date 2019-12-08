@@ -16,10 +16,9 @@ object Factorization {
   val seedVal: Int = 123
   val minRating: Int = 1
   val maxRating: Int = 5
-  val convergenceIterations: Int = 3
+  val convergenceIterations: Int = 10
   val lambda: Double = 0.01
-
-
+  val maxFilter = 50000
 
   def main(args: Array[String]) {
 
@@ -49,16 +48,16 @@ object Factorization {
 
     val partitioner = new HashPartitioner(5)
 
-    val residual = sc.doubleAccumulator
-    val pu_norm = sc.doubleAccumulator
-    val qi_norm = sc.doubleAccumulator
-
     val inputRDD = sc.textFile("input/small.txt")
       .map { line => {
         val list = line.split(",")
-        (list(0).toInt, (list(1).toInt, list(2).toInt))
+        (list(0).toInt, (list(1).toInt, list(2).toInt))}
       }
-      }.partitionBy(partitioner)
+      .filter{
+          case (userId,(movieId, rating)) =>
+              userId <= maxFilter
+        }
+      .partitionBy(partitioner)
 
     val sortedUsers = sortByRelativeIndex("user", inputRDD)
     val sortedItems = sortByRelativeIndex("item", inputRDD)
@@ -98,19 +97,17 @@ object Factorization {
     var q_bcast = sc.broadcast(Q)
     var p_bcast = sc.broadcast(P)
 
-    var iter = 0
-    var totalIter = 3
+    val iterations  = sc.longAccumulator
     var totalCost = Double.MaxValue
-
+    val tolerance = 0.005
     var prevCost = sc.broadcast(0.0)
 
-    var tolerance = 0.005
+    val residual = sc.doubleAccumulator
 
-    while(totalCost >= tolerance) {
+    while(totalCost >= tolerance && iterations.value < convergenceIterations ) {
       // #### Step to calculate New P ####
-
       // calculates gradient for new P in RDD form
-      var newP = computeGradient(R_u, q_bcast, lambda)
+      val newP = computeGradient(R_u, q_bcast, lambda)
         .sortByKey()
         .map(data => data._2)
         .collect()
@@ -119,9 +116,8 @@ object Factorization {
       P = DenseMatrix(newP.map(_.toArray):_*).t
 
       // #### Step to calculate New Q ####
-
       // calculates gradient for new Q in RDD form
-      var newQ = computeGradient(R_i, p_bcast, lambda)
+      val newQ = computeGradient(R_i, p_bcast, lambda)
         .sortByKey()
         .map(data => data._2)
         .collect()
@@ -138,27 +134,26 @@ object Factorization {
       q_bcast = sc.broadcast(Q)
 
       // #### Step to compute cost ####
-
       R_u.foreach{ case (userId, (movieId, r_ij)) =>
           val q_i = Q(::, movieId.toInt)
           val p_u = P(::, userId.toInt)
-
           residual.add( math.pow(r_ij - (p_u.t * q_i), 2))
       }
 
+      val pu_norm = sum(sum(P *:* P, Axis._0))
+      val qi_norm = sum(sum(Q *:* Q, Axis._0))
 
-      totalCost = residual.sum
+      totalCost = residual.sum + lambda * (pu_norm + qi_norm)
 
       val costDiff = math.abs(totalCost - prevCost.value)
 
-      println("Iteration(" + iter + ") Cost: " + prevCost.value + " Delta: " + costDiff)
-
+      println("Iteration(" + iterations.value + ") Cost: " + totalCost + " Delta: " + costDiff)
       residual.reset()
 
       prevCost.unpersist()
       prevCost = sc.broadcast(totalCost)
 
-      iter += 1
+      iterations.add(1)
     }
   }
 
