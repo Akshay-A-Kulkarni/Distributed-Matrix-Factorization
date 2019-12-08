@@ -18,8 +18,7 @@ object Factorization {
   val maxRating: Int = 5
   val convergenceIterations: Int = 3
   val lambda: Double = 0.01
-
-
+  val maxFilter = 50000
 
   def main(args: Array[String]) {
 
@@ -56,9 +55,13 @@ object Factorization {
     val inputRDD = sc.textFile("input/small.txt")
       .map { line => {
         val list = line.split(",")
-        (list(0).toInt, (list(1).toInt, list(2).toInt))
+        (list(0).toInt, (list(1).toInt, list(2).toInt))}
       }
-      }.partitionBy(partitioner)
+      .filter{
+          case (userId,(movieId, rating)) =>
+              userId <= maxFilter
+        }
+      .partitionBy(partitioner)
 
     val sortedUsers = sortByRelativeIndex("user", inputRDD)
     val sortedItems = sortByRelativeIndex("item", inputRDD)
