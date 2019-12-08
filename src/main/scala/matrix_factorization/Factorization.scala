@@ -16,7 +16,7 @@ object Factorization {
   val seedVal: Int = 123
   val minRating: Int = 1
   val maxRating: Int = 5
-  val convergenceIterations: Int = 3
+  val convergenceIterations: Int = 10
   val lambda: Double = 0.01
   val maxFilter = 50000
 
@@ -101,17 +101,18 @@ object Factorization {
     var q_bcast = sc.broadcast(Q)
     var p_bcast = sc.broadcast(P)
 
-    var iter = 0
-    var totalIter = 3
+    val iterations  = sc.longAccumulator
+    val cost :Seq[Double] = Seq(0.0,0.0)
+
     var totalCost = Double.MaxValue
 
-    var tolerance = 0.005
-    while(totalCost >= tolerance) {
+    val tolerance = 0.005
+    iterations.reset()
 
+    while(totalCost >= tolerance && iterations.value < convergenceIterations ) {
       // #### Step to calculate New P ####
-
       // calculates gradient for new P in RDD form
-      var newP = computeGradient(R_u, q_bcast, lambda)
+      val newP = computeGradient(R_u, q_bcast, lambda)
         .sortByKey()
         .map(data => data._2)
         .collect()
@@ -119,14 +120,9 @@ object Factorization {
       // converts newP to a new dense matrix P
       P = DenseMatrix(newP.map(_.toArray):_*).t
 
-      // Rebroadcast P
-      p_bcast.unpersist()
-      p_bcast = sc.broadcast(P)
-
       // #### Step to calculate New Q ####
-
       // calculates gradient for new Q in RDD form
-      var newQ = computeGradient(R_i, p_bcast, lambda)
+      val newQ = computeGradient(R_i, p_bcast, lambda)
         .sortByKey()
         .map(data => data._2)
         .collect()
@@ -134,25 +130,31 @@ object Factorization {
       // converts newQ to a new dense matrix Q
       Q = DenseMatrix(newQ.map(_.toArray):_*).t
 
+      // Rebroadcast P
+      p_bcast.unpersist()
+      p_bcast = sc.broadcast(P)
+
       // Rebroadcast Q
       q_bcast.unpersist()
       q_bcast = sc.broadcast(Q)
 
       // #### Step to compute cost ####
-
       R_u.foreach{ case (userId, (movieId, r_ij)) =>
           val q_i = Q(::, movieId.toInt)
           val p_u = P(::, userId.toInt)
-
           residual.add( math.pow(r_ij - (p_u.t * q_i), 2))
       }
+      val pu_norm_val = sum(sum(P *:* P, Axis._0))
+      val qi_norm_val = sum(sum(Q *:* Q, Axis._0))
 
+      pu_norm.add(pu_norm_val)
+      qi_norm.add(qi_norm_val)
 
-      totalCost = residual.sum
-      println("Iteration(" + iter + ") Cost: " + totalCost)
+      totalCost = residual.sum + lambda*(pu_norm.value + qi_norm.value)
+      iterations.add(1)
+
+      println("Iteration(" + iterations.value + ") Cost: " + totalCost)
       residual.reset()
-
-      iter += 1
     }
   }
 
