@@ -18,7 +18,6 @@ object Factorization {
   val maxRating: Int = 5
   val convergenceIterations: Int = 10
   val lambda: Double = 0.1
-  val maxFilter = 50000
 
   def main(args: Array[String]) {
 
@@ -26,11 +25,11 @@ object Factorization {
     // Delete output directory, only to ease local development; will not work on AWS. ===========
     val hadoopConf = new org.apache.hadoop.conf.Configuration
     val hdfs = org.apache.hadoop.fs.FileSystem.get(hadoopConf)
-    try {
-      hdfs.delete(new org.apache.hadoop.fs.Path(args(0)), true)
-    } catch {
-      case _: Throwable => {}
-    }
+//    try {
+//      hdfs.delete(new org.apache.hadoop.fs.Path(args(0)), true)
+//    } catch {
+//      case _: Throwable => {}
+//    }
     // ================
 
     val conf = new SparkConf()
@@ -48,7 +47,9 @@ object Factorization {
 
     val partitioner = new HashPartitioner(5)
 
-    val inputRDD = sc.textFile("input/small.txt")
+    val maxFilter = args(1).toInt
+
+    val inputRDD = sc.textFile(args(0))
       .map { line => {
         val list = line.split(",")
         (list(0).toInt, (list(1).toInt, list(2).toInt))}
@@ -112,7 +113,6 @@ object Factorization {
         .map(data => data._2)
         .collect()
 
-      // #### Step to calculate New Q ####
       // calculates gradient for new Q in RDD form
       val newQ = computeGradient(R_i, p_bcast, lambda)
         .sortByKey()
@@ -121,6 +121,7 @@ object Factorization {
 
       // converts newP to a new dense matrix P
       P = DenseMatrix(newP.map(_.toArray):_*).t
+
       // converts newQ to a new dense matrix Q
       Q = DenseMatrix(newQ.map(_.toArray):_*).t
 
@@ -136,21 +137,22 @@ object Factorization {
       R_u.foreach{ case (userId, (movieId, r_ij)) =>
           val q_i = Q(::, movieId.toInt)
           val p_u = P(::, userId.toInt)
-          residual.add( math.pow(r_ij - (p_u.t * q_i), 2))
+          residual.add(math.pow(r_ij - (p_u.t * q_i), 2))
       }
 
       val pu_norm = sum(sum(P *:* P, Axis._0))
       val qi_norm = sum(sum(Q *:* Q, Axis._0))
 
-      totalCost = residual.sum + lambda * (pu_norm + qi_norm)
+      totalCost = residual.sum + (lambda * (pu_norm + qi_norm))
 
       val costDiff = math.abs(totalCost - prevCost.value)
 
       println("Iteration(" + iterations.value + ") Cost: " + totalCost + " Delta: " + costDiff)
-      residual.reset()
 
-      prevCost.unpersist()
+      prevCost.destroy()
       prevCost = sc.broadcast(totalCost)
+
+      residual.reset()
 
       iterations.add(1)
     }
