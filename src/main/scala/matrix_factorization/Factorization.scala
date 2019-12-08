@@ -102,9 +102,11 @@ object Factorization {
     var totalIter = 3
     var totalCost = Double.MaxValue
 
-    var tolerance = 0.005
-    while(totalCost >= tolerance) {
+    var prevCost = sc.broadcast(0.0)
 
+    var tolerance = 0.005
+
+    while(totalCost >= tolerance) {
       // #### Step to calculate New P ####
 
       // calculates gradient for new P in RDD form
@@ -116,10 +118,6 @@ object Factorization {
       // converts newP to a new dense matrix P
       P = DenseMatrix(newP.map(_.toArray):_*).t
 
-      // Rebroadcast P
-      p_bcast.unpersist()
-      p_bcast = sc.broadcast(P)
-
       // #### Step to calculate New Q ####
 
       // calculates gradient for new Q in RDD form
@@ -130,6 +128,10 @@ object Factorization {
 
       // converts newQ to a new dense matrix Q
       Q = DenseMatrix(newQ.map(_.toArray):_*).t
+
+      // Rebroadcast P
+      p_bcast.unpersist()
+      p_bcast = sc.broadcast(P)
 
       // Rebroadcast Q
       q_bcast.unpersist()
@@ -146,8 +148,15 @@ object Factorization {
 
 
       totalCost = residual.sum
-      println("Iteration(" + iter + ") Cost: " + totalCost)
+
+      val costDiff = math.abs(totalCost - prevCost.value)
+
+      println("Iteration(" + iter + ") Cost: " + prevCost.value + " Delta: " + costDiff)
+
       residual.reset()
+
+      prevCost.unpersist()
+      prevCost = sc.broadcast(totalCost)
 
       iter += 1
     }
