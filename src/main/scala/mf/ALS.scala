@@ -40,7 +40,7 @@ object ALS {
 
     val conf = new SparkConf()
       .setAppName("ALSMatrixFactorization")
-      .setMaster("local[*]")
+//      .setMaster("local[*]")
 
     val spark = SparkSession.builder()
       .config(conf)
@@ -158,8 +158,8 @@ object ALS {
       costHistory =sc.broadcast(costHistory.value :+ totalCost)
       iterations.add(1)
     }
-    println("COSTHIST")
-    println(costHistory.value)
+    logger.info("Cost History")
+    logger.info(costHistory.value)
   }
 
   def computeGradient(R: Iterable[(Long, Int)], constantLatentMatrix: Broadcast[DenseMatrix[Double]], lambda: Double)
