@@ -12,12 +12,12 @@ import org.apache.spark.sql.SparkSession
 
 object Factorization {
 
-  val nFactors: Int = 3
+  val nFactors: Int = 5
   val seedVal: Int = 123
   val minRating: Int = 1
   val maxRating: Int = 5
   val convergenceIterations: Int = 10
-  val lambda: Double = 0.01
+  val lambda: Double = 0.1
   val maxFilter = 50000
 
   def main(args: Array[String]) {
@@ -105,15 +105,12 @@ object Factorization {
     val residual = sc.doubleAccumulator
 
     while(totalCost >= tolerance && iterations.value < convergenceIterations ) {
-      // #### Step to calculate New P ####
-      // calculates gradient for new P in RDD form
+      // Step to calculate New P
+      // Calculates gradient for new P in RDD form
       val newP = computeGradient(R_u, q_bcast, lambda)
         .sortByKey()
         .map(data => data._2)
         .collect()
-
-      // converts newP to a new dense matrix P
-      P = DenseMatrix(newP.map(_.toArray):_*).t
 
       // #### Step to calculate New Q ####
       // calculates gradient for new Q in RDD form
@@ -122,15 +119,17 @@ object Factorization {
         .map(data => data._2)
         .collect()
 
+      // converts newP to a new dense matrix P
+      P = DenseMatrix(newP.map(_.toArray):_*).t
       // converts newQ to a new dense matrix Q
       Q = DenseMatrix(newQ.map(_.toArray):_*).t
 
       // Rebroadcast P
-      p_bcast.unpersist()
+      p_bcast.destroy()
       p_bcast = sc.broadcast(P)
 
       // Rebroadcast Q
-      q_bcast.unpersist()
+      q_bcast.destroy()
       q_bcast = sc.broadcast(Q)
 
       // #### Step to compute cost ####
