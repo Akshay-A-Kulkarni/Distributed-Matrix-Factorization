@@ -12,7 +12,7 @@ import org.apache.spark.sql.SparkSession
 
 object Factorization {
 
-  val nFactors: Int = 5
+  val nFactors: Int = 50
   val seedVal: Int = 123
   val minRating: Int = 1
   val maxRating: Int = 5
@@ -54,10 +54,11 @@ object Factorization {
         val list = line.split(",")
         (list(0).toInt, (list(1).toInt, list(2).toInt))}
       }
-      .filter{
+     .filter{
         case (userId,(movieId, rating)) =>
           userId <= maxFilter
       }
+
       .partitionBy(partitioner)
 
     val sortedUsers = sortByRelativeIndex("user", inputRDD)
@@ -93,8 +94,11 @@ object Factorization {
 
     val rand = new scala.util.Random(seedVal)
     val rand1 = new scala.util.Random(seedVal+1)
+//    var P = DenseMatrix.fill(nFactors, sortedUsers.length)(rand.nextDouble())
+//    var Q = DenseMatrix.fill(nFactors, sortedItems.length)(rand1.nextDouble())
+
     var P = DenseMatrix.fill(nFactors, sortedUsers.length)(minRating + rand.nextDouble() * (maxRating - minRating) + 1)
-    var Q = DenseMatrix.fill(nFactors, sortedItems.length)(minRating + rand1.nextDouble() * (maxRating - minRating) + 1)
+    var Q = DenseMatrix.fill(nFactors, sortedItems.length)(minRating + rand.nextDouble() * (maxRating - minRating) + 1)
 
     var q_bdcast = sc.broadcast(Q)
     var p_bdcast = sc.broadcast(P)
@@ -108,6 +112,7 @@ object Factorization {
     val residual = sc.doubleAccumulator
 
     while(costDiff.value >= tolerance && iterations.value < convergenceIterations ) {
+
       // Step to calculate New P
       // Calculates gradient for new P in RDD form
       val newP = computeGradient(R_u, q_bdcast, lambda)
@@ -115,21 +120,21 @@ object Factorization {
         .map(data => data._2)
         .collect()
 
+      // converts newP to a new dense matrix P
+      var P = DenseMatrix(newP.map(_.toArray):_*).t
+
+      // Rebroadcast P
+      p_bdcast.destroy()
+      p_bdcast = sc.broadcast(P)
+
       // calculates gradient for new Q in RDD form
       val newQ = computeGradient(R_i, p_bdcast, lambda)
         .sortByKey()
         .map(data => data._2)
         .collect()
 
-      // converts newP to a new dense matrix P
-      P = DenseMatrix(newP.map(_.toArray):_*).t
-
       // converts newQ to a new dense matrix Q
-      Q = DenseMatrix(newQ.map(_.toArray):_*).t
-
-      // Rebroadcast P
-      p_bdcast.destroy()
-      p_bdcast = sc.broadcast(P)
+      var Q = DenseMatrix(newQ.map(_.toArray):_*).t
 
       // Rebroadcast Q
       q_bdcast.destroy()
@@ -150,7 +155,9 @@ object Factorization {
       costDiff.reset()
       costDiff.add(math.abs(totalCost - prevCost.value))
 
+      logger.info("Iteration(" + iterations.value + ") Cost: " + totalCost + " Delta: " + costDiff.value)
       println("Iteration(" + iterations.value + ") Cost: " + totalCost + " Delta: " + costDiff.value)
+
       residual.reset()
 
       prevCost.reset()
