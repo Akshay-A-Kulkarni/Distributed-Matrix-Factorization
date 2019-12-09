@@ -1,6 +1,5 @@
 package mf
 
-
 import breeze.linalg._
 import breeze.linalg.{DenseMatrix, DenseVector, pinv}
 import org.apache.log4j.LogManager
@@ -8,7 +7,6 @@ import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.{HashPartitioner, SparkConf}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
-
 
 object ALS {
 
@@ -22,14 +20,13 @@ object ALS {
     // Delete output directory, only to ease local development; will not work on AWS. ===========
     val hadoopConf = new org.apache.hadoop.conf.Configuration
 
-//    val hdfs = org.apache.hadoop.fs.FileSystem.get(hadoopConf)
+  //val hdfs = org.apache.hadoop.fs.FileSystem.get(hadoopConf)
     //    try {
     //      hdfs.delete(new org.apache.hadoop.fs.Path(args(0)), true)
     //    } catch {
     //      case _: Throwable => {}
     //    }
     // ================
-
 
     val nFactors: Int = 50
     val seedVal: Int = 123
@@ -98,7 +95,6 @@ object ALS {
 
       // Step to calculate New P
       // Calculates gradient for new P in RDD form
-
       val newP = R_u.groupByKey()
         .mapValues(row => computeGradient(row,q_bdcast,lambda))
         .sortByKey()
@@ -159,7 +155,7 @@ object ALS {
   }
 
   def computeGradient(R: Iterable[(Long, Int)], constantLatentMatrix: Broadcast[DenseMatrix[Double]], lambda: Double)
-  :  DenseMatrix[Double] = {
+                                                                                              :  DenseMatrix[Double] = {
     /*
     @params
     Q: DenseMatrix[Double]       : Broadcasted dense latent factor matrix
@@ -170,7 +166,8 @@ object ALS {
     Computes the gradient step and updates for each latent factor matrix.
     */
     val listsTuple = R.unzip
-    val optimizedMatrix = inv(computeTransposeProductSum(listsTuple._1, constantLatentMatrix.value) + lambda *:* DenseMatrix.eye[Double](constantLatentMatrix.value.rows)) * computeRatingProduct(listsTuple._1, listsTuple._2, constantLatentMatrix.value)
+    val optimizedMatrix =
+      inv(computeTransposeProductSum(listsTuple._1, constantLatentMatrix.value) + lambda *:* DenseMatrix.eye[Double](constantLatentMatrix.value.rows)) * computeRatingProduct(listsTuple._1, listsTuple._2, constantLatentMatrix.value)
     return optimizedMatrix
   }
 
@@ -190,7 +187,8 @@ object ALS {
     return LatentFactorSum
   }
 
-  def computeRatingProduct(columns: Iterable[Long], ratings: Iterable[Int], M: DenseMatrix[Double]): DenseMatrix[Double] = {
+  def computeRatingProduct(columns: Iterable[Long], ratings: Iterable[Int], M: DenseMatrix[Double])
+                                                                                            : DenseMatrix[Double] = {
     /*
     @params
     columns: Iterable[Long] : list of indices associated with given user/item.
