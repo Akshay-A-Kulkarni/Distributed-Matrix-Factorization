@@ -3,9 +3,12 @@ Spark - Matrix Factorization using ALS
 
 Code authors
 -----------
-John Bica
 Akshay Kulkarni
+
+John Bica
+
 Geoff Korb
+
 Shawn Martin
 
 Installation
