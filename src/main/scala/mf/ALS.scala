@@ -15,8 +15,8 @@ object ALS {
   def main(args: Array[String]) {
 
     val logger: org.apache.log4j.Logger = LogManager.getRootLogger
-    if (args.length < 5) {
-      logger.error("Usage:\nmf.ALS <INPUT_PATH> <MAX_FILTER> <NUM_ITER> <LAMBDA> <NUM_PARTITIONS>")
+    if (args.length < 4) {
+      logger.error("Usage:\nmf.ALS <INPUT_PATH> <MAX_FILTER> <NUM_ITER> <LAMBDA>")
       System.exit(1)
     }
     // Delete output directory, only to ease local development; will not work on AWS. ===========
@@ -51,8 +51,6 @@ object ALS {
 
     val sc = spark.sparkContext
 
-    val partitioner = new HashPartitioner(args(4).toInt)
-
     val maxFilter = args(1).toInt
 
     val inputRDD = sc.textFile(args(0))
@@ -65,8 +63,6 @@ object ALS {
           userId <= maxFilter
       }
 
-      .partitionBy(partitioner)
-
     val sortedUsers = sortByRelativeIndex("user", inputRDD)
     val sortedItems = sortByRelativeIndex("item", inputRDD)
 
@@ -78,7 +74,7 @@ object ALS {
     val R_u = inputRDD.map { case (u, (i, v)) => (getRelativeIndex(u, sortedUsers), (getRelativeIndex(i, sortedItems), v)) }
       .cache()
 
-    val R_i = R_u.map(i => (i._2._1, (i._1, i._2._2))).partitionBy(partitioner).cache()
+    val R_i = R_u.map(i => (i._2._1, (i._1, i._2._2))).cache()
 
     val rand = new scala.util.Random(seedVal)
     val rand1 = new scala.util.Random(seedVal+1)
@@ -174,7 +170,7 @@ object ALS {
     Computes the gradient step and updates for each latent factor matrix.
     */
     val listsTuple = R.unzip
-    val optimizedMatrix = pinv(computeTransposeProductSum(listsTuple._1, constantLatentMatrix.value) + lambda *:* DenseMatrix.eye[Double](constantLatentMatrix.value.rows)) * computeRatingProduct(listsTuple._1, listsTuple._2, constantLatentMatrix.value)
+    val optimizedMatrix = inv(computeTransposeProductSum(listsTuple._1, constantLatentMatrix.value) + lambda *:* DenseMatrix.eye[Double](constantLatentMatrix.value.rows)) * computeRatingProduct(listsTuple._1, listsTuple._2, constantLatentMatrix.value)
     return optimizedMatrix
   }
 

@@ -5,3 +5,4 @@ Makefile
 .DS_Store
 
 !input/small.txt
+*.jar
