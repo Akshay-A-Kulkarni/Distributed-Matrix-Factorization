@@ -1,10 +1,10 @@
 package mf
 
 import breeze.linalg._
-import breeze.linalg.{DenseMatrix, DenseVector, pinv}
+import breeze.linalg.{DenseMatrix, DenseVector}
 import org.apache.log4j.LogManager
 import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.{HashPartitioner, SparkConf}
+import org.apache.spark.{SparkConf}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 
@@ -17,15 +17,15 @@ object ALS {
       logger.error("Usage:\nmf.ALS <INPUT_PATH> <MAX_FILTER> <NUM_ITER> <LAMBDA>")
       System.exit(1)
     }
-    // Delete output directory, only to ease local development; will not work on AWS. ===========
     val hadoopConf = new org.apache.hadoop.conf.Configuration
 
-  //val hdfs = org.apache.hadoop.fs.FileSystem.get(hadoopConf)
-    //    try {
-    //      hdfs.delete(new org.apache.hadoop.fs.Path(args(0)), true)
-    //    } catch {
-    //      case _: Throwable => {}
-    //    }
+    // Delete output directory, only to ease local development; will not work on AWS. ===========
+//  val hdfs = org.apache.hadoop.fs.FileSystem.get(hadoopConf)
+//        try {
+//          hdfs.delete(new org.apache.hadoop.fs.Path(args(0)), true)
+//        } catch {
+//          case _: Throwable => {}
+//        }
     // ================
 
     val nFactors: Int = 50
@@ -37,14 +37,11 @@ object ALS {
 
     val conf = new SparkConf()
       .setAppName("ALSMatrixFactorization")
-//      .setMaster("local[*]")
+      .setMaster("local[*]")
 
     val spark = SparkSession.builder()
       .config(conf)
       .getOrCreate()
-
-    // For implicit conversions like converting RDDs to DataFrames
-    import spark.implicits._
 
     val sc = spark.sparkContext
 
@@ -84,14 +81,15 @@ object ALS {
 
     val iterations  = sc.longAccumulator
     var totalCost : Double = 0.0
-    val tolerance = 0.005
+    val tolerance = 0.05
     val prevCost = sc.doubleAccumulator
     val costDiff = sc.doubleAccumulator
     costDiff.add(Double.MaxValue)
+    var costDiffDelta = Double.MaxValue
     val residual = sc.doubleAccumulator
     var costHistory = sc.broadcast(Seq[Double]())
 
-    while(costDiff.value >= tolerance && iterations.value < convergenceIterations ) {
+    while(costDiffDelta >= tolerance && iterations.value < convergenceIterations ) {
 
       // Step to calculate New P
       // Calculates gradient for new P in RDD form
@@ -134,11 +132,15 @@ object ALS {
 
       totalCost = residual.sum + (lambda * (pu_norm + qi_norm))
 
+      // Step to compute the cost difference (costDiff) and the change in costDiff, which is compared to the tolerance
+      val prevcostDiff = costDiff.value
       costDiff.reset()
       costDiff.add(math.abs(totalCost - prevCost.value))
 
-      logger.info("Iteration(" + (iterations.value + 1) + ") Cost: " + totalCost + " Delta: " + costDiff.value)
-      println("Iteration(" + (iterations.value + 1) + ") Cost: " + totalCost + " Delta: " + costDiff.value)
+      costDiffDelta = math.abs(costDiff.value - prevcostDiff)/costDiff.value
+
+      logger.info("Iteration(" + (iterations.value + 1) + ") Cost: " + totalCost + " Delta: " + costDiff.value + " DeltaDelta: " + costDiffDelta)
+      println("Iteration(" + (iterations.value + 1) + ") Cost: " + totalCost + " Delta: " + costDiff.value + " DeltaDelta: " + costDiffDelta)
 
       residual.reset()
 
@@ -244,7 +246,7 @@ object ALS {
     valueToFind       : Int -> user/item value to look up
     relativeIndexList : Array -> (value, index) lookup array
 
-    This function takes input a value and a lookup table of (value, index) and returns the index for a given value).
+    This function takes in a value and a lookup table of (value, index) and returns the index for a given value).
     Note: Each value is an unique identifier such that there will be no duplicates in lookup.
     Each value->index relationship is 1-to-1
 
