@@ -1,15 +1,6 @@
 # Matrix Factorization with Alternating Least Squares (ALS)
 Spark - Matrix Factorization using ALS
 
-Code authors
------------
-Akshay Kulkarni
-
-John Bica
-
-Geoff Korb
-
-Shawn Martin
 
 Installation
 ------------
