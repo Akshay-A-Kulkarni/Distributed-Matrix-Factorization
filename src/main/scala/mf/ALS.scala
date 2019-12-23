@@ -155,7 +155,7 @@ object ALS {
     */
     val listsTuple = R.unzip
     val optimizedMatrix =
-      inv(computeTransposeProductSum(listsTuple._1, constantLatentMatrix.value) + lambda *:* DenseMatrix.eye[Double]            (constantLatentMatrix.value.rows)) * computeRatingProduct(listsTuple._1, listsTuple._2, constantLatentMatrix.value)
+      inv(computeTransposeProductSum(listsTuple._1, constantLatentMatrix.value) + lambda *:* DenseMatrix.eye[Double](constantLatentMatrix.value.rows)) * computeRatingProduct(listsTuple._1, listsTuple._2, constantLatentMatrix.value)
     return optimizedMatrix
   }
 
