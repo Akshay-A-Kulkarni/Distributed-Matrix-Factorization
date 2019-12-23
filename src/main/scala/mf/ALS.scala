@@ -67,7 +67,6 @@ object ALS {
     // Creating two Ratings Matrices partitioned by user and item respectively
     val R_u = inputRDD.map { case (u, (i, v)) => (getRelativeIndex(u, sortedUsers), (getRelativeIndex(i, sortedItems), v)) }
       .cache()
-
     val R_i = R_u.map(i => (i._2._1, (i._1, i._2._2))).cache()
 
     val rand = new scala.util.Random(seedVal)
