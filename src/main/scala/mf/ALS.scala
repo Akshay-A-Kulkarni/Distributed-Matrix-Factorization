@@ -11,23 +11,19 @@ import org.apache.spark.sql.SparkSession
 object ALS {
 
   def main(args: Array[String]) {
-
     val logger: org.apache.log4j.Logger = LogManager.getRootLogger
     if (args.length < 4) {
       logger.error("Usage:\nmf.ALS <INPUT_PATH> <MAX_FILTER> <NUM_ITER> <LAMBDA>")
-      System.exit(1)
-    }
+      System.exit(1)}
     val hadoopConf = new org.apache.hadoop.conf.Configuration
-
-    // Delete output directory, only to ease local development; will not work on AWS. ===========
+// Delete output directory, only to ease local development; will not work on AWS.
 //  val hdfs = org.apache.hadoop.fs.FileSystem.get(hadoopConf)
 //        try {
 //          hdfs.delete(new org.apache.hadoop.fs.Path(args(0)), true)
 //        } catch {
 //          case _: Throwable => {}
 //        }
-    // ================
-
+// ================
     val nFactors: Int = 50
     val seedVal: Int = 123
     val minRating: Int = 1
@@ -44,7 +40,6 @@ object ALS {
       .getOrCreate()
 
     val sc = spark.sparkContext
-
     val maxFilter = args(1).toInt
 
     val inputRDD = sc.textFile(args(0))
@@ -56,7 +51,6 @@ object ALS {
         case (userId,(movieId, rating)) =>
           userId <= maxFilter
       }
-
     val sortedUsers = sortByRelativeIndex("user", inputRDD)
     val sortedItems = sortByRelativeIndex("item", inputRDD)
 
@@ -89,7 +83,6 @@ object ALS {
     var costHistory = sc.broadcast(Seq[Double]())
 
     while(costDiffDelta >= tolerance && iterations.value < convergenceIterations ) {
-
       // Step to calculate New P
       // Calculates gradient for new P in RDD form
       val newP = R_u.groupByKey()
@@ -123,29 +116,23 @@ object ALS {
       R_u.foreach{ case (userId, (movieId, r_ij)) =>
         val q_i = Q(::, movieId.toInt)
         val p_u = P(::, userId.toInt)
-        residual.add(math.pow(r_ij - (p_u.t * q_i), 2))
-      }
-
+        residual.add(math.pow(r_ij - (p_u.t * q_i), 2))}
       val pu_norm = sum(sum(P *:* P, Axis._0))
       val qi_norm = sum(sum(Q *:* Q, Axis._0))
-
       totalCost = residual.sum + (lambda * (pu_norm + qi_norm))
 
       // Step to compute the cost difference (costDiff) and the change in costDiff, which is compared to the tolerance
       val prevcostDiff = costDiff.value
       costDiff.reset()
       costDiff.add(math.abs(totalCost - prevCost.value))
-
       costDiffDelta = math.abs(costDiff.value - prevcostDiff)/costDiff.value
 
       logger.info("Iteration(" + (iterations.value + 1) + ") Cost: " + totalCost + " Delta: " + costDiff.value + " DeltaDelta: " + costDiffDelta)
       println("Iteration(" + (iterations.value + 1) + ") Cost: " + totalCost + " Delta: " + costDiff.value + " DeltaDelta: " + costDiffDelta)
 
       residual.reset()
-
       prevCost.reset()
       prevCost.add(totalCost)
-
       residual.reset()
 
       costHistory =sc.broadcast(costHistory.value :+ totalCost)
@@ -168,7 +155,7 @@ object ALS {
     */
     val listsTuple = R.unzip
     val optimizedMatrix =
-      inv(computeTransposeProductSum(listsTuple._1, constantLatentMatrix.value) + lambda *:* DenseMatrix.eye[Double](constantLatentMatrix.value.rows)) * computeRatingProduct(listsTuple._1, listsTuple._2, constantLatentMatrix.value)
+      inv(computeTransposeProductSum(listsTuple._1, constantLatentMatrix.value) + lambda *:* DenseMatrix.eye[Double]            (constantLatentMatrix.value.rows)) * computeRatingProduct(listsTuple._1, listsTuple._2, constantLatentMatrix.value)
     return optimizedMatrix
   }
 
@@ -237,7 +224,6 @@ object ALS {
       }
     }
   }
-
 
   def getRelativeIndex(valueToFind: Int, relativeIndexList: Array[(Int, Long)]): Long = {
     /*
