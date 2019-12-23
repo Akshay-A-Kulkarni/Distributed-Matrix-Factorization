@@ -14,7 +14,8 @@ object ALS {
     val logger: org.apache.log4j.Logger = LogManager.getRootLogger
     if (args.length < 4) {
       logger.error("Usage:\nmf.ALS <INPUT_PATH> <MAX_FILTER> <NUM_ITER> <LAMBDA>")
-      System.exit(1)}
+      System.exit(1)
+    }
     val hadoopConf = new org.apache.hadoop.conf.Configuration
 // Delete output directory, only to ease local development; will not work on AWS.
 //  val hdfs = org.apache.hadoop.fs.FileSystem.get(hadoopConf)
