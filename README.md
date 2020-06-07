@@ -33,20 +33,19 @@ All of the build & execution commands are organized in the Makefile.
 1) Initial
 2) Open command prompt.
 3) Navigate to directory where the project files unzipped.
-4) Add or move the edges.csv file to the input folder of the project folder 
-5) Edit the Makefile to customize the environment at the top.
+4) Edit the Makefile to customize the environment at the top.
 	Sufficient for standalone: hadoop.root, jar.name, local.input, job.name
 	Other defaults acceptable for running standalone.
 	For AWS customize the following to run AWS EMR Hadoop below:
 	ams.emr.release, aws.bucket, aws.num.nodes, aws.instance.type
-6) Standalone Hadoop:
+5) Standalone Hadoop:
 	make switch-standalone		-- set standalone Hadoop environment (execute once)
 	make local
-7) Pseudo-Distributed Hadoop: (https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/SingleCluster.html#Pseudo-Distributed_Operation)
+6) Pseudo-Distributed Hadoop: (https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/SingleCluster.html#Pseudo-Distributed_Operation)
 	make switch-pseudo			-- set pseudo-clustered Hadoop environment (execute once)
 	make pseudo					-- first execution
 	make pseudoq				-- later executions since namenode and datanode already running 
-8) AWS EMR Hadoop: (you must configure the emr.* config parameters at top of Makefile)
+7) AWS EMR Hadoop: (you must configure the emr.* config parameters at top of Makefile)
 	make upload-input-aws		-- only before first execution
 	make aws					-- check for successful execution with web interface (aws.amazon.com)
 	download-output-aws			-- after successful execution & termination
